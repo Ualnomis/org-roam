@@ -6,7 +6,7 @@
 ;; URL: https://github.com/org-roam/org-roam
 ;; Keywords: org-mode, roam, convenience
 ;; Version: 2.2.2
-;; Package-Requires: ((emacs "26.1") (dash "2.13") (org "9.4") (magit-section "3.0.0"))
+;; Package-Requires: ((emacs "26.1") (dash "2.13") (org "9.6") (magit-section "3.0.0"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -32,6 +32,7 @@
 ;; interactively.
 ;;
 ;;; Code:
+(require 'crm)
 (require 'org-roam)
 
 ;;; Options
@@ -309,7 +310,8 @@ Return nil if there's no node with such REF."
 Uses the ID, and fetches remaining details from the database.
 This can be quite costly: avoid, unless dealing with very few
 nodes."
-  (when-let ((node-info (car (org-roam-db-query [:select [file level pos todo priority
+  (when-let ((node-info (car (org-roam-db-query [:select [
+                                                          file level pos todo priority
                                                           scheduled deadline title properties olp]
                                                  :from nodes
                                                  :where (= id $s1)
@@ -417,8 +419,9 @@ FROM
   GROUP BY id, tags )
 GROUP BY id")))
     (cl-loop for row in rows
-             append (pcase-let* ((`(,id ,file ,file-title ,level ,todo ,pos ,priority ,scheduled ,deadline
-                                        ,title ,properties ,olp ,atime ,mtime ,tags ,aliases ,refs)
+             append (pcase-let* ((`(
+                                    ,id ,file ,file-title ,level ,todo ,pos ,priority ,scheduled ,deadline
+                                    ,title ,properties ,olp ,atime ,mtime ,tags ,aliases ,refs)
                                   row)
                                  (all-titles (cons title aliases)))
                       (mapcar (lambda (temp-title)
@@ -444,12 +447,11 @@ GROUP BY id")))
 ;;;; Finders
 (defun org-roam-node-marker (node)
   "Get the marker for NODE."
-  (unwind-protect
-      (let* ((file (org-roam-node-file node))
-             (buffer (or (find-buffer-visiting file)
-                         (find-file-noselect file))))
-        (with-current-buffer buffer
-          (move-marker (make-marker) (org-roam-node-point node) buffer)))))
+  (let* ((file (org-roam-node-file node))
+         (buffer (or (find-buffer-visiting file)
+                     (find-file-noselect file))))
+    (with-current-buffer buffer
+      (move-marker (make-marker) (org-roam-node-point node) buffer))))
 
 (defun org-roam-node-open (node &optional cmd force)
   "Go to the node NODE.
@@ -476,7 +478,7 @@ NODE, unless FORCE is non-nil."
                           (org-roam-id-at-point))))
       (goto-char m))
     (move-marker m nil))
-  (org-show-context))
+  (org-fold-show-context))
 
 (defun org-roam-node-visit (node &optional other-window force)
   "From the current buffer, visit NODE. Return the visited buffer.
@@ -878,6 +880,7 @@ node."
   (org-with-point-at 1
     (let ((title (nth 4 (org-heading-components)))
           (tags (org-get-tags)))
+      (org-fold-show-all)
       (kill-whole-line)
       (org-roam-end-of-meta-data t)
       (insert "#+title: " title "\n")
@@ -887,7 +890,8 @@ node."
 
 ;;;###autoload
 (defun org-roam-refile (node)
-  "Refile node at point to an Org-roam node.
+  "Refile node at point to an org-roam NODE.
+
 If region is active, then use it instead of the node at point."
   (interactive
    (list (org-roam-node-read nil nil nil 'require-match)))
@@ -1053,7 +1057,7 @@ and when nil is returned the node will be filtered out."
   (let ((node (org-roam-node-at-point 'assert)))
     (save-excursion
       (goto-char (org-roam-node-point node))
-      (org-roam-property-add "ROAM_REFS" (if (memq " " (string-to-list ref))
+      (org-roam-property-add "ROAM_REFS" (if (member " " (string-to-list ref))
                                              (concat "\"" ref "\"")
                                            ref)))))
 
